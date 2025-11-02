@@ -145,7 +145,7 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
     
     if not sales.empty:
         fact_sales = sales.copy()
-        keep = [c for c in ["order_id", "customer_id", "channel_id", "store_id", "total_amount", "ord_created_at", "created_at", "order_date"] if c in fact_sales.columns]
+        keep = [c for c in ["order_id", "customer_id", "channel_id", "store_id", "billing_address_id", "shipping_address_id", "total_amount", "subtotal", "tax_amount", "shipping_fee", "currency_code", "status", "ord_created_at", "created_at", "order_date"] if c in fact_sales.columns]
         fact_sales = fact_sales[keep]
         if "order_id" in fact_sales.columns:
             order_map = make_mapping(fact_sales["order_id"])
@@ -157,10 +157,15 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
             fact_sales["channel_key"] = fact_sales["channel_id"].map(mappings["channel_id"]).astype(pd.Int64Dtype())
         if "store_id" in fact_sales.columns and "store_id" in mappings:
             fact_sales["store_key"] = fact_sales["store_id"].map(mappings["store_id"]).astype(pd.Int64Dtype())
-        drop_cols = [c for c in ["order_id", "customer_id", "channel_id", "store_id"] if c in fact_sales.columns]
+        if "billing_address_id" in fact_sales.columns and "address_id" in mappings:
+            fact_sales["billing_address_key"] = fact_sales["billing_address_id"].map(mappings["address_id"]).astype(pd.Int64Dtype())
+        if "shipping_address_id" in fact_sales.columns and "address_id" in mappings:
+            fact_sales["shipping_address_key"] = fact_sales["shipping_address_id"].map(mappings["address_id"]).astype(pd.Int64Dtype())
+        drop_cols = [c for c in ["order_id", "customer_id", "channel_id", "store_id", "billing_address_id", "shipping_address_id"] if c in fact_sales.columns]
         fact_sales = fact_sales.drop(columns=drop_cols)
         cols = [c for c in ["order_key"] if c in fact_sales.columns]
-        cols += [c for c in ["customer_key", "channel_key", "store_key"] if c in fact_sales.columns]
+        cols += [c for c in ["customer_key", "channel_key", "store_key", "billing_address_key", "shipping_address_key"] if c in fact_sales.columns]
+        cols += [c for c in ["total_amount", "subtotal", "tax_amount", "shipping_fee", "currency_code", "status", "ord_created_at", "created_at", "order_date"] if c in fact_sales.columns]
         cols += [c for c in fact_sales.columns if c not in cols]
         fact_sales = fact_sales[cols]
         fact_sales.to_csv(dw_dir / "fact_sales_order.csv", index=False)
@@ -184,6 +189,11 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
             order_to_store_natural = dict(zip(sales["order_id"], sales["store_id"]))
             if "store_id" in mappings:
                 order_to_store_key = {o: mappings["store_id"].get(s) for o, s in order_to_store_natural.items()}
+        order_to_order_date = {}
+        for dc in ["created_at", "order_date", "ord_created_at", "created"]:
+            if dc in sales.columns:
+                order_to_order_date = dict(zip(sales["order_id"], sales[dc].astype(str)))
+                break
 
     
     if not payments.empty:
@@ -228,6 +238,8 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
                 fact_items["channel_key"] = fact_items["order_id"].map(order_to_channel_key).astype(pd.Int64Dtype())
             if order_to_store_key:
                 fact_items["store_key"] = fact_items["order_id"].map(order_to_store_key).astype(pd.Int64Dtype())
+            if 'order_to_order_date' in locals() and order_to_order_date:
+                fact_items['order_date'] = fact_items['order_id'].map(order_to_order_date)
         if "product_id" in fact_items.columns and "product_id" in mappings:
             fact_items["product_key"] = fact_items["product_id"].map(mappings["product_id"]).astype(pd.Int64Dtype())
         drop_cols = [c for c in ["order_item_id", "order_id", "product_id"] if c in fact_items.columns]
