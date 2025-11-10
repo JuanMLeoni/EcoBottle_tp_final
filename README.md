@@ -94,5 +94,5 @@ Los archivos resultantes (por ejemplo `DW/dim_customer.csv`, `DW/fact_sales_orde
 
 ![Modelo Estrella Web Session](./assets/session.png)
 
-Si las imágenes no se muestran en la vista previa de GitHub, abrí la carpeta `organizado/assets/` y abrí los PNGs directamente.
+Si las imágenes no se muestran en la vista previa de GitHub, abrí la carpeta `assets/` y abrí los PNGs directamente.
 
