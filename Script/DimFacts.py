@@ -176,6 +176,8 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
     order_to_customer_key = {}
     order_to_channel_key = {}
     order_to_store_key = {}
+    order_to_billing_key = {}
+    order_to_shipping_key = {}
     if not sales.empty and "order_id" in sales.columns:
         if "customer_id" in sales.columns:
             order_to_customer_natural = dict(zip(sales["order_id"], sales["customer_id"]))
@@ -189,6 +191,14 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
             order_to_store_natural = dict(zip(sales["order_id"], sales["store_id"]))
             if "store_id" in mappings:
                 order_to_store_key = {o: mappings["store_id"].get(s) for o, s in order_to_store_natural.items()}
+        if "billing_address_id" in sales.columns:
+            order_to_billing_natural = dict(zip(sales["order_id"], sales["billing_address_id"]))
+            if "address_id" in mappings:
+                order_to_billing_key = {o: mappings["address_id"].get(a) for o, a in order_to_billing_natural.items()}
+        if "shipping_address_id" in sales.columns:
+            order_to_shipping_natural = dict(zip(sales["order_id"], sales["shipping_address_id"]))
+            if "address_id" in mappings:
+                order_to_shipping_key = {o: mappings["address_id"].get(a) for o, a in order_to_shipping_natural.items()}
         order_to_order_date = {}
         for dc in ["created_at", "order_date", "ord_created_at", "created"]:
             if dc in sales.columns:
@@ -238,6 +248,10 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
                 fact_items["channel_key"] = fact_items["order_id"].map(order_to_channel_key).astype(pd.Int64Dtype())
             if order_to_store_key:
                 fact_items["store_key"] = fact_items["order_id"].map(order_to_store_key).astype(pd.Int64Dtype())
+            if order_to_billing_key:
+                fact_items["billing_address_key"] = fact_items["order_id"].map(order_to_billing_key).astype(pd.Int64Dtype())
+            if order_to_shipping_key:
+                fact_items["shipping_address_key"] = fact_items["order_id"].map(order_to_shipping_key).astype(pd.Int64Dtype())
             if 'order_to_order_date' in locals() and order_to_order_date:
                 fact_items['order_date'] = fact_items['order_id'].map(order_to_order_date)
         if "product_id" in fact_items.columns and "product_id" in mappings:
@@ -246,6 +260,7 @@ def build_dims_and_facts(staging_dir: Path, dw_dir: Path):
         fact_items = fact_items.drop(columns=drop_cols)
         cols = [c for c in ["order_item_key"] if c in fact_items.columns]
         cols += [c for c in ["customer_key", "channel_key", "store_key"] if c in fact_items.columns]
+        cols += [c for c in ["billing_address_key", "shipping_address_key"] if c in fact_items.columns]
         cols += [c for c in ["product_key"] if c in fact_items.columns]
         cols += [c for c in fact_items.columns if c not in cols]
         fact_items = fact_items[cols]
